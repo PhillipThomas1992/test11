@@ -1,6 +1,106 @@
-build_kit:
-  name: python3
-  version: latest
-outbound_topics:
-  - name: HELLO_WORLD_MESSAGE
-    message_type: make87_messages.text.text_plain.PlainText
+version: 1
+interfaces:
+  - name: zenoh
+    protocol: zenoh
+    default_port:
+      name: zenoh
+      protocol: TCP
+      target_port: 7447
+      publish_mode: Ingress
+      is_system_interface: false
+      is_dev_interface: false
+    publishers:
+      - name: image
+        spec:
+          make87_message: make87_messages.image.uncompressed.ImageRawAny:f22zvy
+        config:
+          type: object
+          properties:
+            congestion_control:
+              type: string
+              enum:
+                - DROP
+                - BLOCK
+              default: DROP
+            priority:
+              type: string
+              enum:
+                - REAL_TIME
+                - INTERACTIVE_HIGH
+                - INTERACTIVE_LOW
+                - DATA_HIGH
+                - DATA
+                - DATA_LOW
+                - BACKGROUND
+              default: DATA
+            express:
+              type: boolean
+              default: true
+            reliability:
+              type: string
+              enum:
+                - BEST_EFFORT
+                - RELIABLE
+              default: RELIABLE
+        encoding: proto
+  - name: mediamtx_http
+    protocol: http
+    clients:
+      - name: mediamtx_api
+        spec:
+          string: mediamtx_api:1.0
+  - name: rtsp_connection
+    protocol: rtsp
+    clients:
+      - name: rtsp_connection
+        spec:
+          string: rtsp
+container_config:
+  environment:
+    RUST_LOG: info
+config:
+  type: object
+  properties:
+    camera_paths:
+      type: array
+      description: Optional list of camera path names to process. If not set, all available paths are used.
+      items:
+        type: string
+    output_fps:
+      type: number
+      minimum: 0
+      description: |
+        Optional target frame-rate (frames per second) after down-sampling.
+        If omitted, the application forwards the stream at its native FPS.
+      default: null
+    output_width:
+      type: integer
+      minimum: 1
+      description: |
+        Optional output width for the video stream. If omitted, the native width is used, unless output_height is set. Then a new output_width is calculated based on input aspect ratio.
+      default: null
+    output_height:
+      type: integer
+      minimum: 1
+      description: |
+        Optional output height for the video stream. If omitted, the native height is used, unless output_width is set. Then a new output_height is calculated based on input aspect ratio.
+      default: null
+build:
+  build_kit:
+    name: python3
+variants:
+  qsv:
+    peripheral_requirements:
+      - peripheral_type: GenericDevice
+        name: RENDER
+        constraints:
+          type: GenericDevice
+          path_prefix: /dev/dri/renderD
+          path_suffix: null
+          contains: null
+          contains_not: null
+    build:
+      build_kit:
+        name: python3
+        platforms:
+          - linux/amd64
